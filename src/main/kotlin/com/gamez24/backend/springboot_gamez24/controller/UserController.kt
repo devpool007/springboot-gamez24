@@ -8,7 +8,7 @@ import com.gamez24.backend.springboot_gamez24.dto.UserOutDTO
 import com.gamez24.backend.springboot_gamez24.service.AuthService
 import com.gamez24.backend.springboot_gamez24.service.JwtService
 import com.gamez24.backend.springboot_gamez24.service.UserService
-import jakarta.servlet.http.Cookie
+//import jakarta.servlet.http.Cookie
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
 import jakarta.validation.Valid
@@ -18,6 +18,8 @@ import org.springframework.security.core.Authentication
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.web.bind.annotation.*
 import org.springframework.web.server.ResponseStatusException
+import org.springframework.http.ResponseCookie
+import org.springframework.http.HttpHeaders
 
 @RestController
 @RequestMapping("/users")
@@ -40,13 +42,14 @@ class UserController(
             val token = jwtService.generateToken(user)
 
             // Set JWT cookie - matching your FastAPI implementation
-            val jwtCookie = Cookie("jwt", token).apply {
-                isHttpOnly = true
-                secure = false // Set to true in production with HTTPS
-                maxAge = 86400 // 24 hours
-                path = "/"
-            }
-            response.addCookie(jwtCookie)
+            val jwtCookie = ResponseCookie.from("jwt", token)
+                .httpOnly(true)
+                .secure(true)
+                .sameSite("None")
+                .maxAge(24 * 60 * 60) // 24 hours in seconds
+                .path("/")
+                .build()
+            response.addHeader(HttpHeaders.SET_COOKIE, jwtCookie.toString())
 
             ResponseEntity.ok(userOut)
         } catch (e: Exception) {
@@ -55,6 +58,7 @@ class UserController(
                     HttpStatus.BAD_REQUEST,
                     "Email already registered"
                 )
+
                 else -> throw ResponseStatusException(
                     HttpStatus.INTERNAL_SERVER_ERROR,
                     "User creation failed"
@@ -71,14 +75,17 @@ class UserController(
         return try {
             val tokenDTO = authService.login(userLoginDTO)
 
-            // Set JWT cookie - matching your FastAPI implementation
-            val jwtCookie = Cookie("jwt", tokenDTO.accessToken).apply {
-                isHttpOnly = true
-                secure = false // Set to true in production with HTTPS
-                maxAge = 86400 // 24 hours
-                path = "/"
-            }
-            response.addCookie(jwtCookie)
+            // Build JWT cookie with modern flags
+            val jwtCookie = ResponseCookie.from("jwt", tokenDTO.accessToken)
+                .httpOnly(true)
+                .secure(true)       // must be true in production (Cloud Run = HTTPS)
+                .sameSite("None")   // required for cross-site requests
+                .maxAge(24 * 60 * 60) // 24 hours in seconds
+                .path("/")
+                .build()
+
+            // Add cookie to response
+            response.addHeader(HttpHeaders.SET_COOKIE, jwtCookie.toString())
 
             ResponseEntity.ok(tokenDTO)
         } catch (e: Exception) {
@@ -93,15 +100,16 @@ class UserController(
     fun logout(response: HttpServletResponse): ResponseEntity<Map<String, String>> {
         println("👋 Logout request received")
 
-        // Delete the JWT cookie by setting it with maxAge = 0
-        val jwtCookie = Cookie("jwt", "").apply {
-            isHttpOnly = true
-            secure = false // Set to true in production with HTTPS
-            maxAge = 0     // This deletes the cookie immediately
-            path = "/"     // Must match the path used when setting the cookie
-        }
+        // Delete the JWT cookie by overwriting it with maxAge = 0
+        val jwtCookie = ResponseCookie.from("jwt", "")
+            .httpOnly(true)
+            .secure(true)      // keep consistent with login/signup
+            .sameSite("None")  // must match how it was set
+            .path("/")         // must match as well
+            .maxAge(0)         // expire immediately
+            .build()
 
-        response.addCookie(jwtCookie)
+        response.addHeader(HttpHeaders.SET_COOKIE, jwtCookie.toString())
         println("✅ JWT cookie deleted")
 
         return ResponseEntity.ok(mapOf("message" to "Logged out successfully"))
