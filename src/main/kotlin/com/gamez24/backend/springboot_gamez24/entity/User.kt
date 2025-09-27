@@ -9,7 +9,11 @@ import org.springframework.security.core.userdetails.UserDetails
 import java.time.LocalDateTime
 
 @Entity
-@Table(name = "users")
+@Table(name = "users",
+    indexes = [
+        Index(name = "idx_users_email", columnList = "email"),
+        Index(name = "idx_users_username", columnList = "username")
+    ])
 class User(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -19,6 +23,12 @@ class User(
     @field:Email
     @field:NotBlank
     var email: String = "",
+
+    @Column(name = "username", unique = true, nullable = false)
+    @field:NotBlank
+    @get:JvmName("getUserDisplayName") // Avoid clash with UserDetails.getUsername()
+    @set:JvmName("setUserDisplayName")
+    var username: String = "",
 
     @Column(nullable = false)
     @field:NotBlank
@@ -32,10 +42,10 @@ class User(
 ) : UserDetails {
 
     // No-argument constructor for JPA
-    constructor() : this(0, "", "", LocalDateTime.now(), LocalDateTime.now())
+    constructor() : this(0, "", "", "", LocalDateTime.now(), LocalDateTime.now())
 
     // Secondary constructor for easy creation
-    constructor(email: String, password: String) : this(0, email, password, LocalDateTime.now(), LocalDateTime.now())
+    constructor(email: String, username: String, password: String) : this(0, email, username, password, LocalDateTime.now(), LocalDateTime.now())
 
     // UserDetails implementation
     override fun getAuthorities(): Collection<GrantedAuthority> = emptyList()
@@ -78,5 +88,5 @@ class User(
 
     override fun hashCode(): Int = id.hashCode()
 
-    override fun toString(): String = "User(id=$id, email='$email')"
+    override fun toString(): String = "User(id=$id, email='$email', username='$username')"
 }
