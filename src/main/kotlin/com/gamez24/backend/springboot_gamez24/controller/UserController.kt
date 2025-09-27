@@ -1,6 +1,5 @@
 package com.gamez24.backend.springboot_gamez24.controller
 
-
 import com.gamez24.backend.springboot_gamez24.dto.TokenDTO
 import com.gamez24.backend.springboot_gamez24.dto.UserCreateDTO
 import com.gamez24.backend.springboot_gamez24.dto.UserLoginDTO
@@ -12,6 +11,7 @@ import com.gamez24.backend.springboot_gamez24.service.UserService
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
 import jakarta.validation.Valid
+import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.Authentication
@@ -29,17 +29,27 @@ class UserController(
     private val userService: UserService
 ) {
 
+    private val logger = LoggerFactory.getLogger(UserController::class.java)
+
     @PostMapping("/signup")
     fun signup(
         @Valid @RequestBody userCreateDTO: UserCreateDTO,
         response: HttpServletResponse
     ): ResponseEntity<UserOutDTO> {
+        logger.info("🚀 Signup request received for email: ${userCreateDTO.email}, username: ${userCreateDTO.username}")
+
         return try {
+
+            logger.debug("📝 Creating user...")
             val userOut = authService.signup(userCreateDTO)
+            logger.info("✅ User created with ID: ${userOut.id}, username: ${userOut.username}")
+
 
             // Create JWT token for the new user
+            logger.debug("🔑 Generating JWT token...")
             val user = userService.findByEmail(userCreateDTO.email)
             val token = jwtService.generateToken(user)
+            logger.debug("✅ JWT token generated: ${token.take(20)}...")
 
             // Set JWT cookie - matching your FastAPI implementation
             val jwtCookie = ResponseCookie.from("jwt", token)
@@ -51,6 +61,8 @@ class UserController(
                 .build()
             response.addHeader(HttpHeaders.SET_COOKIE, jwtCookie.toString())
 
+            logger.info("✅ JWT cookie set successfully")
+
             ResponseEntity.ok(userOut)
         } catch (e: Exception) {
             when (e.message) {
@@ -58,6 +70,14 @@ class UserController(
                     HttpStatus.BAD_REQUEST,
                     "Email already registered"
                 )
+
+                "Username already taken" -> { // ✅ Handle username conflict
+                    logger.warn("👤 Username already exists: ${userCreateDTO.username}")
+                    throw ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "Username already taken"
+                    )
+                }
 
                 else -> throw ResponseStatusException(
                     HttpStatus.INTERNAL_SERVER_ERROR,
@@ -142,7 +162,7 @@ class UserController(
             println("✅ Found JWT cookie: ${token.take(20)}...")
 
             // Return user data with userid field for compatibility
-            ResponseEntity.ok(UserOutDTO(user.id, user.email))
+            ResponseEntity.ok(UserOutDTO(user.id, user.email, user.username))
         } catch (e: Exception) {
             println("❌ Token validation failed: ${e.message}")
             throw ResponseStatusException(

@@ -19,13 +19,19 @@ class UserService(
             throw RuntimeException("Email already registered")
         }
 
+        // ✅ Check for existing username
+        if (userRepository.existsByUsername(userCreateDTO.username)) {
+            throw RuntimeException("Username already taken")
+        }
+
         val user = User(
             email = userCreateDTO.email,
+            username = userCreateDTO.username,
             password = passwordEncoder.encode(userCreateDTO.password)
         )
 
         val savedUser = userRepository.save(user)
-        return UserOutDTO(savedUser.id, savedUser.email)
+        return UserOutDTO(savedUser.id, savedUser.username, savedUser.email)
     }
 
     fun findByEmail(email: String): User {
@@ -33,10 +39,16 @@ class UserService(
             ?: throw RuntimeException("User not found")
     }
 
+    // ✅ Add method to find by username (optional)
+    fun findByUsername(username: String): User {
+        return userRepository.findByUsername(username)
+            ?: throw RuntimeException("User not found")
+    }
+
     fun getUserById(id: Long): UserOutDTO {
         val user = userRepository.findById(id).orElseThrow {
             RuntimeException("User not found")
         }
-        return UserOutDTO(user.id, user.email)
+        return UserOutDTO(user.id, user.email, user.username)
     }
 }
