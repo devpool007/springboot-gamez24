@@ -8,3 +8,14 @@ fun String.toSlug(): String = lowercase(Locale.getDefault())
     .split(" ")
     .joinToString("-")
     .replace("-+".toRegex(), "-")
+
+fun String.toUniqueSlug(): String {
+    val slug = this.trim()
+        .replace(Regex("[^a-zA-Z0-9\\s]"), "")
+        .split(Regex("\\s+"))
+        .joinToString("-")
+        .lowercase()
+
+    // Append a UUID to ensure uniqueness
+    return "$slug-${UUID.randomUUID()}"
+}
