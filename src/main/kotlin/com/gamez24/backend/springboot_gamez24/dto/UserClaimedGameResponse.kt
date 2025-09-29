@@ -28,3 +28,15 @@ data class PaginationDTO(
     @JsonProperty("has_previous")
     val hasPrevious: Boolean
 )
+
+data class PaginationArticleDTO(
+    val page: Int,
+    val limit: Int,
+    val total: Long,
+    @JsonProperty("total_pages")
+    val totalPages: Int,
+    @JsonProperty("has_next")
+    val hasNext: Boolean,
+    @JsonProperty("has_previous")
+    val hasPrevious: Boolean
+)
